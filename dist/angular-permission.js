@@ -228,6 +228,7 @@
           var rolePermissions = null;
 
           angular.forEach(Permission.roleValidations, function(r){
+            // TODO: here we need to use $defered promise then stuff
             var res = r.call();
             if(rolePermissions == null && res != false){
               rolePermissions = res;
