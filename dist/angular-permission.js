@@ -156,6 +156,44 @@
 
             return deferred.promise;
           },
+          // chain all promises together
+          // stop resolving r.call() if a r.call() promise returns a permission hash
+          _getCurrentPermissions: function(rV){
+            if(rV == undefined || rV == null){
+              rV = [];
+
+              for (var key in Permission.roleValidations){
+                rV.push(Permission.roleValidations[key]);
+              }
+            }else{
+              var rV1 = [];
+              for (var key in rV){
+                rV1.push(rV[key]);
+              }
+              rV = angular.copy(rV1);
+            }
+
+            var deferred  = $q.defer();
+            var roleValidations = angular.copy(rV);
+            var currentRoleValidation = roleValidations.shift();
+
+            if (!currentRoleValidation) {
+              deferred.reject();
+              return deferred.promise;
+            }
+
+            currentRoleValidation.call().then(function (permission) {
+              deferred.resolve(permission);
+            }, function () {
+              Permission._getCurrentPermissions(roleValidations).then(function (permission) {
+                deferred.resolve(permission);
+              }, function () {
+                deferred.reject();
+              });
+            });
+
+            return deferred.promise;
+          },
           defineRole: function (roleName, validationFunction) {
             /**
               Service-available version of defineRole, the callback passed here lives in the
@@ -219,38 +257,7 @@
       return{
         restrict: 'A',
         link: function (scope, element, attributes) {
-          // chain all promises together
-          // stop resolving r.call() if a r.call() promise returns a permission hash
-          function getPermssions(){
-            var chainedPromises = null;
-
-            angular.forEach(Permission.roleValidations, function(r){
-              // initialize first promise
-              if( chainedPromises === null) {
-                // r.call() has to returns a promise
-                chainedPromises = r.call();
-              }else {
-                // chain promises together
-                // then method decides upon promise resolution if the next promise should be
-                // resolved or if we are done
-                // this assumes that only one role can be active at a given time, or more precisly:
-                // the first role returning not null will be the role used for permission checking
-                chainedPromises.then(function (permissions) {
-                  if (permissions != null) {
-                    return permissions;
-                  }
-                  else {
-                    // again, r.call() has to return a promise
-                    return r.call();
-                  }
-                })
-              }
-            });
-
-            return chainedPromises;
-          }
-
-          getPermssions().then(function(rolePermissions){
+          Permission._getCurrentPermissions().then(function(rolePermissions){
             var elementRemovalMethod = attributes.permissionElementRemoval;
             var hideMethod = hideElement;
             var showMethod = showElement;
@@ -285,6 +292,8 @@
               });
               hideMethod(element);
             }
+          }, function(){
+            var a = 1;
           })
         }
       }
