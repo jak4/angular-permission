@@ -253,14 +253,23 @@
 'use strict';
 (function () {
   angular.module('permission')
-    .directive('permission', ['Permission','removeElement', 'hideElement', 'showElement', function (Permission, removeElement, hideElement, showElement) {
+    .directive('permission', ['Permission','removeElement', 'hideElement', 'showElement', 'hideAll', 'showAll', function (Permission, removeElement, hideElement, showElement, hideAll, showAll) {
       return{
         restrict: 'A',
         link: function (scope, element, attributes) {
+          var elementRemovalMethod  = attributes.permissionElementRemoval;
+          var hideMethod            = hideElement;
+          var showMethod            = showElement;
+          if(elementRemovalMethod != null) {
+            // if we want to delete the elements from the DOM we use 'delete'
+            if (elementRemovalMethod == 'delete') {
+              hideMethod = removeElement;
+              showMethod = null;
+            }
+          }
+          hideAll(element, hideMethod);
+
           Permission._getCurrentPermissions().then(function(rolePermissions){
-            var elementRemovalMethod = attributes.permissionElementRemoval;
-            var hideMethod = hideElement;
-            var showMethod = showElement;
             var allowedAccess = attributes.permission.split(":");
             var modelClass = allowedAccess[0];
             var modelOperation = allowedAccess[1];
@@ -279,29 +288,32 @@
             }
 
             if(hasAccess){
-              if (showMethod != null) {
-                angular.forEach(element.children(), function (child) {
-                  showMethod($(child));
-                });
-                showMethod(element);
-              }
+              showAll(element, showMethod);
             }
             else {
-              angular.forEach(element.children(), function (child) {
-                hideMethod($(child));
-              });
-              hideMethod(element);
+              hideAll(element, hideMethod);
             }
           }, function(){
-            var a = 1;
+            hideAll(element, hideMethod);
           })
         }
       }
     }]).constant('hideElement', function(element){
-        element && element.addClass('ng-hide');
+      element && element.addClass('ng-hide');
     }).constant('showElement', function(element){
-        element && element.removeClass('ng-hide');
+      element && element.removeClass('ng-hide');
     }).constant('removeElement', function(element){
-        element && element.remove && element.remove();
+      element && element.remove && element.remove();
+    }).constant('hideAll', function(element, hideMethod){
+      angular.forEach(element.children(), function (child) {
+        hideMethod($(child));
+      });
+      hideMethod(element);
+    }).constant('showAll', function(element, showMethod){
+        // if showMethod is not defined this will fail, be warned
+      angular.forEach(element.children(), function (child) {
+        showMethod($(child));
+      });
+      showMethod(element);
     });
 }());
